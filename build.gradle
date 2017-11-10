@@ -1,0 +1,129 @@
+
+// This plugin's version (typically must match that of ES).
+version = '5.6.1'
+group = 'org.entitysearch'
+
+buildscript {
+    ext {
+        // ES version we depend upon/ compile against.
+        version_es = '5.6.1'
+    }
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        jcenter()
+    }
+
+    dependencies {
+        classpath "org.elasticsearch.gradle:build-tools:" + version_es
+    }
+}
+
+apply plugin: 'elasticsearch.esplugin'
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+
+apply plugin: 'maven'
+apply plugin: 'signing'
+apply plugin: 'maven-publish'
+
+ext {
+  projectSubstitutions = [:]
+  licenseFile = rootProject.file('LICENSE.txt')
+  noticeFile = rootProject.file('NOTICE.txt')
+} 
+
+esplugin {
+    name 'elasticsearch-carrot2'
+    description 'Search results clustering plugin for ElasticSearch (Carrot2-based)'
+    classname 'org.carrot2.elasticsearch.ClusteringPlugin'
+}
+
+// We don't have unit tests, only integration tests.
+test {
+  enabled = false
+}
+
+integTestRunner {
+  systemProperty 'tests.security.manager', 'false'
+}
+
+licenseHeaders.enabled = false
+dependencyLicenses.enabled = false
+thirdPartyAudit.enabled = false
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+// esplugin forces transitive:false on all dependencies
+// so list all transitive dependencies individually
+dependencies {
+    compile "org.simpleframework:simple-xml:2.7.1"
+    compile "commons-lang:commons-lang:2.6"
+    compile "com.fasterxml.jackson.core:jackson-core:2.8.6"
+    compile "com.fasterxml.jackson.core:jackson-annotations:2.8.6"
+    compile "com.fasterxml.jackson.core:jackson-databind:2.8.6"
+    compile "org.slf4j:slf4j-api:1.7.13"
+    compile "org.slf4j:slf4j-log4j12:1.7.13"
+
+    testCompile "org.assertj:assertj-core:2.1.0"
+    testCompile "org.json:json:20140107"
+    testCompile "org.elasticsearch.client:transport:" + version_es
+
+    testCompile "org.apache.httpcomponents:httpclient:${versions.httpclient}"
+    testCompile "org.apache.httpcomponents:httpcore:${versions.httpcore}"
+}
+
+artifacts {
+    archives javadocJar, sourcesJar
+}
+
+signing {
+    required { gradle.taskGraph.hasTask("uploadArchives") }
+    sign configurations.archives
+}
+
+project.gradle.taskGraph.whenReady { taskGraph ->
+  if (taskGraph.allTasks.any { it.name == 'uploadArchives' }) {
+    uploadArchives {
+      repositories {
+        mavenDeployer {
+          beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+          repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+            authentication(userName: nexusUsername, password: nexusPassword)
+          }
+
+          snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+            authentication(userName: nexusUsername, password: nexusPassword)
+          }
+
+          pom.project {
+            name 'Search results clustering plugin for Elasticsearch (Carrot2-based)'
+            packaging 'zip'
+            artifactId 'elasticsearch-carrot2'
+            description 'Search results clustering plugin for Elasticsearch (Carrot2-based)'
+            url 'https://github.com/carrot2/elasticsearch-carrot2'
+
+            scm {
+              connection 'scm:git:https://github.com/carrot2/elasticsearch-carrot2'
+              developerConnection 'scm:git:git@github.com:carrot2/elasticsearch-carrot2.git'
+              url 'https://github.com/carrot2/elasticsearch-carrot2'
+            }
+
+            licenses {
+              license {
+                name 'The Apache License, Version 2.0'
+                url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
